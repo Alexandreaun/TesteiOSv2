@@ -8,10 +8,25 @@
 
 import UIKit
 
+enum LoginType {
+    case email, cpf
+}
+
 class LoginViewController: UIViewController {
     
     let viewModel = CurrencyViewModel(apiManager: ApiManager())
-    var name: String?
+    var userLogin = [DataUser]()
+    var dataUser: DataUser?
+    var isRegisteredUser = false
+    var isValidUser: Bool = false
+    var isValidPassword: Bool = false
+    var textLenght: String = ""
+    var loginType: LoginType = .cpf
+    let messagesErrorAlert: [String] = [
+        "Você inseriu algum dado incorreto, por favor digite um login ou senha válida. Seguir a regra para senha: 8 digitos com pelo menos uma letra maiúscula, um caracter especial e um caracter alfanumérico",
+        "O usuário inserido não está registrado!",
+        "Todos os campos devem ser preenchidos!"
+    ]
     
     lazy var imageViewLogo: UIImageView = {
         let v = UIImageView(image: UIImage(named: "Logo"))
@@ -25,18 +40,17 @@ class LoginViewController: UIViewController {
         v.keyboardType = .alphabet
         v.keyboardAppearance = .light
         v.font = UIFont().fontAppDefault(size: 15)
-        v.textColor = .colorBlack
+        v.textColor = .colorLightGray
         v.backgroundColor = .white
         v.borderStyle = .none
         v.textAlignment = .left
         v.layer.masksToBounds = true
-        v.tintColor = .colorGray
+        v.tintColor = .colorLightGray
         v.layer.cornerRadius = 4
         v.layer.borderWidth = 1
         v.delegate = self
         v.layer.borderColor = UIColor.colorBorder.cgColor
         v.attributedPlaceholder = NSAttributedString(string: "User", attributes: [NSAttributedString.Key.font : UIFont().fontAppDefault(size: 15)])
-        v.addTarget(self, action: #selector(myTextFieldDidChange), for: .editingChanged)
         v.translatesAutoresizingMaskIntoConstraints = false
         return v
     }()
@@ -46,18 +60,17 @@ class LoginViewController: UIViewController {
         v.keyboardType = .alphabet
         v.keyboardAppearance = .light
         v.font = UIFont().fontAppDefault(size: 15)
-        v.textColor = .colorBlack
+        v.textColor = .colorLightGray
         v.backgroundColor = .white
         v.borderStyle = .none
         v.textAlignment = .left
         v.layer.masksToBounds = true
-        v.tintColor = .colorGray
+        v.tintColor = .colorLightGray
         v.layer.cornerRadius = 4
         v.layer.borderWidth = 1
         v.delegate = self
         v.layer.borderColor = UIColor.colorBorder.cgColor
-        v.attributedPlaceholder = NSAttributedString(string: "Passwork", attributes: [NSAttributedString.Key.font : UIFont().fontAppDefault(size: 15)])
-        v.addTarget(self, action: #selector(myTextFieldDidChange), for: .editingChanged)
+        v.attributedPlaceholder = NSAttributedString(string: "Password", attributes: [NSAttributedString.Key.font : UIFont().fontAppDefault(size: 15)])
         v.translatesAutoresizingMaskIntoConstraints = false
         return v
     }()
@@ -66,73 +79,104 @@ class LoginViewController: UIViewController {
         let v = UIButton()
         v.setTitle("Login", for: .normal)
         v.titleLabel?.font = UIFont().fontAppDefault(size: 16)
-        v.setTitleColor(UIColor.colorWhite, for: .normal)
-        v.backgroundColor = .colorBlue
+        v.setTitleColor(UIColor.colorWhiteBkg, for: .normal)
+        v.backgroundColor = .colorBlueBkg
         v.layer.cornerRadius = 4
         v.layer.masksToBounds = true
         v.layer.shadowRadius = 1
         v.layer.shadowOpacity = 1
         v.layer.shadowOffset = CGSize(width: 0, height: 4)
-        v.layer.shadowColor = UIColor.colorBlue.cgColor
+        v.layer.shadowColor = UIColor.colorBlueBkg.cgColor
         v.addTarget(self, action: #selector(goToLogin), for: .touchUpInside)
         v.translatesAutoresizingMaskIntoConstraints = false
         return v
     }()
     
-    
-    
-    
     override func viewDidLoad() {
         super.viewDidLoad()
         setupLayoutUI()
-        loadContendLogin()
-        
+        loadContentLogin()
     }
     
-    private func loadContendLogin() {
+    override func viewDidAppear(_ animated: Bool) {
+        loadLastUserLogged()
+    }
+    
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        loadLastUserLogged()
+        textFieldPassword.text = ""
+    }
+    
+    private func loadLastUserLogged() {
+        if viewModel.loadUsuarioLogged() != nil {
+            textFieldUser.becomeFirstResponder()
+            textFieldUser.text = viewModel.loadUsuarioLogged()?.email ?? ""
+            textFieldUser.resignFirstResponder()
+        }else {
+            textFieldUser.text = ""
+            textFieldUser.becomeFirstResponder()
+            textFieldUser.resignFirstResponder()
+        }
+    }
+    
+    private func loadContentLogin() {
         viewModel.loadLogin { (error) in
             DispatchQueue.main.async {
                 if error == nil {
-                    self.name = self.viewModel.loginName
+                    self.userLogin = self.viewModel.userAccount
                 }else{
-                    self.showError(buttonLabel: "OK", titleError: "Atencao", messageError: "banana")
+                    self.showError(buttonLabel: "OK", titleError: "ATENÇÃO!", messageError: "Houve algum problema ao carregar os dados, tente novamente!")
                 }
             }
         }
     }
     
-    @objc func myTextFieldDidChange(_ textField: UITextField) {
-       
-        if let text = textField.text, textField.isEqual(textFieldUser) {
+    private func validateTextField(_ text: String, _ textField: UITextField){
         
-            if !text.isString {
-                textFieldUser.text = text.applyFormatNumbersCPF(pattern: "xxx.xxx.xxx-xx", replacmentCharacter: "x")
-            }else{
+        if text != "" {
+            
+            if textField.isEqual(textFieldUser) {
+                if text.isString {
+                    loginType = .email
+                }else {
+                    loginType = .cpf
+                }
+                (isRegisteredUser, dataUser) = viewModel.checkIsValidLogin(loginType: loginType, user: text)
                 
-            }
-            
-            
-        }
-    }
-    
-    private func validateTextField(_ text: String, _ textField: UITextField) {
-        if textField.isEqual(textFieldUser) {
-
-            if text.isNumber {
-                print("isNumber")
-
-                textFieldUser.text = text.applyFormatNumbersCPF(pattern: "xxx.xxx.xxx-xx", replacmentCharacter: "x")
-
-            }else if text.isString {
-                print("é letra")
+                switch loginType {
+                case .cpf:
+                    isValidUser = (textLenght.count == 11) ? true : false
+                    textField.text = text.applyFormatNumbersCPF(pattern: "xxx.xxx.xxx-xx", replacmentCharacter: "x")
+                    break
+                default:
+                    isValidUser = ValidateEmail.validate(email: text)
+                    break
+                }
+            }else {
+                isValidPassword = ValidatePassword.validpassword(password: text)
             }
         }
     }
     
     @objc func goToLogin() {
-        let vc = ListCurrencyViewController()
-        vc.modalPresentationStyle = .fullScreen
-        present(vc, animated: true, completion: nil)
+        
+        if textFieldUser.text != "" && textFieldPassword.text != "" {
+            if isValidUser && isValidPassword && isRegisteredUser {
+                let vc = ListCurrencyViewController(viewModel: viewModel)
+                vc.modalPresentationStyle = .fullScreen
+                vc.dataUserLoged = dataUser
+                present(vc, animated: true, completion: nil)
+                
+            }else if !(isValidUser || isValidPassword) {
+                self.showError(buttonLabel: "OK", titleError: "ATENÇÃO!", messageError: messagesErrorAlert[0])
+                
+            }else if !(isRegisteredUser) {
+                self.showError(buttonLabel: "OK", titleError: "ATENÇÃO!", messageError: messagesErrorAlert[1])
+            }
+        }else {
+            self.showError(buttonLabel: "OK", titleError: "ATENÇÃO!", messageError: messagesErrorAlert[2])
+        }
     }
     
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -145,7 +189,7 @@ class LoginViewController: UIViewController {
         view.addSubview(textFieldUser)
         view.addSubview(textFieldPassword)
         view.addSubview(buttonLogin)
-    
+        
         var topanchor: NSLayoutYAxisAnchor
         var bottomanchor: NSLayoutYAxisAnchor
         
@@ -182,21 +226,23 @@ class LoginViewController: UIViewController {
             buttonLogin.widthAnchor.constraint(equalToConstant: 202)
         ])
     }
-    
-
-
 }
 
 extension LoginViewController: UITextFieldDelegate {
     
     
-    func textField(_ textField: UITextField, shouldChangeCharactersIn range: NSRange, replacementString string: String) -> Bool {
-        validateTextField(textField.text ?? "", textField)
+    @discardableResult func textField(_ textField: UITextField, shouldChangeCharactersIn range: NSRange, replacementString string: String) -> Bool {
+        
+        if textField.isEqual(textFieldUser) {
+            let currentText = textField.text ?? ""
+            guard let stringRange = Range(range, in: currentText) else {return false}
+            textLenght = currentText.replacingCharacters(in: stringRange, with: string)
+        }
         return true
     }
     
-    
-    func textFieldShouldEndEditing(_ textField: UITextField) -> Bool {
+    @discardableResult func textFieldShouldEndEditing(_ textField: UITextField) -> Bool {
+        validateTextField(textField.text ?? "", textField)
         return true
     }
     
